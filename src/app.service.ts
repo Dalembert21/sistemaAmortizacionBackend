@@ -84,8 +84,16 @@ export class AppService {
       
       if (!orgData) throw new NotFoundException('Organización no encontrada');
       
+      const finalName = (
+        orgData.institution_name === 'Financiera Financo' || 
+        orgData.institution_name === 'Cooperativa Financo' ||
+        orgData.institution_name === 'Banco Pichincha'
+      ) 
+        ? 'Sistema Financiero DB' 
+        : orgData.institution_name;
+        
       return {
-        institutionName: orgData.institution_name,
+        institutionName: finalName,
         logoBase64: orgData.logo_base_64,
         primaryColor: orgData.primary_color || '#E6621F',
         insuranceRate: Number(orgData.insurance_rate),
