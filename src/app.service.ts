@@ -89,16 +89,8 @@ export class AppService {
       
       if (!orgData) throw new NotFoundException('Organización no encontrada');
       
-      const finalName = (
-        orgData.institution_name === 'Financiera Financo' || 
-        orgData.institution_name === 'Cooperativa Financo' ||
-        orgData.institution_name === 'Banco Pichincha'
-      ) 
-        ? 'Sistema Financiero DB' 
-        : orgData.institution_name;
-        
       return {
-        institutionName: finalName,
+        institutionName: orgData.institution_name || 'Sistema Financiero DB',
         logoBase64: orgData.logo_base_64,
         insuranceRate: Number(orgData.insurance_rate),
         donationSolca: Number(orgData.donation_solca),
@@ -128,12 +120,17 @@ export class AppService {
 
   async updateConfig(orgId: string, newConfig: any) {
     if (this.supabase) {
-      await this.supabase.from('organizations').update({
+      const { error: updateError } = await this.supabase.from('organizations').update({
         institution_name: newConfig.institutionName,
         logo_base_64: newConfig.logoBase64 || '',
         insurance_rate: newConfig.insuranceRate,
         donation_solca: newConfig.donationSolca
       }).eq('id', orgId);
+      
+      if (updateError) {
+        console.error("Supabase Update Error:", updateError);
+        // Fallback silente o lanzar exepcion según diseño backend, aquí logeamos para no romper frontend si hay mismatch.
+      }
 
       // Handle credits 
       // For simplicity in sync, remove old credits and insert new ones
