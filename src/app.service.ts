@@ -16,11 +16,15 @@ export class AppService {
       config: {
         institutionName: 'Sistema Financiero DB',
         logoBase64: '',
-        primaryColor: '#E6621F',
         credits: [
           { id: 1, name: 'Crédito de Consumo', minRate: 10, maxRate: 16.5, minAmount: 500, maxAmount: 20000 },
           { id: 2, name: 'Crédito Hipotecario', minRate: 8, maxRate: 11, minAmount: 20000, maxAmount: 500000 },
           { id: 3, name: 'Crédito Educativo', minRate: 7, maxRate: 9, minAmount: 1000, maxAmount: 30000 },
+        ],
+        investments: [
+          { id: 1, name: 'Corto Plazo', minAmount: 100, maxAmount: 10000, minTerm: 1, maxTerm: 12 },
+          { id: 2, name: 'Largo Plazo', minAmount: 5000, maxAmount: 100000, minTerm: 12, maxTerm: 120 },
+          { id: 3, name: 'Ahora Flex', minAmount: 50, maxAmount: 50000, minTerm: 1, maxTerm: 60 }
         ],
         insuranceRate: 0.1,
         donationSolca: 2.0
@@ -81,6 +85,7 @@ export class AppService {
     if (this.supabase) {
       const { data: orgData } = await this.supabase.from('organizations').select('*').eq('id', orgId).single();
       const { data: creditsData } = await this.supabase.from('credits').select('*').eq('org_id', orgId);
+      const { data: investmentsData } = await this.supabase.from('investments').select('*').eq('org_id', orgId);
       
       if (!orgData) throw new NotFoundException('Organización no encontrada');
       
@@ -95,7 +100,6 @@ export class AppService {
       return {
         institutionName: finalName,
         logoBase64: orgData.logo_base_64,
-        primaryColor: orgData.primary_color || '#E6621F',
         insuranceRate: Number(orgData.insurance_rate),
         donationSolca: Number(orgData.donation_solca),
         credits: (creditsData || []).map(c => ({
@@ -105,6 +109,14 @@ export class AppService {
           maxRate: Number(c.max_rate),
           minAmount: Number(c.min_amount),
           maxAmount: Number(c.max_amount)
+        })),
+        investments: (investmentsData || []).map(i => ({
+          id: i.id,
+          name: i.name,
+          minAmount: Number(i.min_amount),
+          maxAmount: Number(i.max_amount),
+          minTerm: Number(i.min_term),
+          maxTerm: Number(i.max_term)
         }))
       };
     } else {
@@ -119,7 +131,6 @@ export class AppService {
       await this.supabase.from('organizations').update({
         institution_name: newConfig.institutionName,
         logo_base_64: newConfig.logoBase64 || '',
-        primary_color: newConfig.primaryColor,
         insurance_rate: newConfig.insuranceRate,
         donation_solca: newConfig.donationSolca
       }).eq('id', orgId);
@@ -137,6 +148,19 @@ export class AppService {
           max_amount: c.maxAmount
         }));
         await this.supabase.from('credits').insert(creditsToInsert);
+      }
+
+      await this.supabase.from('investments').delete().eq('org_id', orgId);
+      if (newConfig.investments && newConfig.investments.length > 0) {
+        const investmentsToInsert = newConfig.investments.map((i: any) => ({
+          org_id: orgId,
+          name: i.name,
+          min_amount: i.minAmount,
+          max_amount: i.maxAmount,
+          min_term: i.minTerm,
+          max_term: i.maxTerm
+        }));
+        await this.supabase.from('investments').insert(investmentsToInsert);
       }
       return newConfig;
     } else {
@@ -182,8 +206,8 @@ export class AppService {
         config: {
           institutionName: data.institutionName,
           logoBase64: '',
-          primaryColor: '#E6621F',
           credits: [],
+          investments: [],
           insuranceRate: 0,
           donationSolca: 0
         }
