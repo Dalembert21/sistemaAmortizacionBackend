@@ -37,8 +37,7 @@ export class AppService {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_KEY;
 
-    // Temporalmente desactivado para pruebas locales
-    if (false && supabaseUrl && supabaseKey) {
+    if (supabaseUrl && supabaseKey) {
       this.supabase = createClient(supabaseUrl!, supabaseKey!);
       console.log("Conectado a Supabase exitosamente.");
     } else {
@@ -173,12 +172,13 @@ export class AppService {
   // --- SUPERADMIN METHODS ---
   async getAllOrganizations() {
     if (this.supabase) {
-      const { data } = await this.supabase.from('organizations').select('id, admin_user, institution_name');
-      return data?.map(o => ({
+      const { data, error } = await this.supabase.from('organizations').select('id, admin_user, institution_name');
+      const result = data?.map(o => ({
         id: o.id,
         adminUser: o.admin_user,
         institutionName: o.institution_name
       })) || [];
+      return result;
     } else {
       return this.memoryOrgs.map(o => ({
         id: o.id,
