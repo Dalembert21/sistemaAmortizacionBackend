@@ -13,6 +13,7 @@ export class AppService {
       id: '11111111-1111-1111-1111-111111111111',
       adminUser: 'admin_financo',
       adminPass: 'admin123',
+      identifier: 'sistema-financiero-db',
       config: {
         institutionName: 'Sistema Financiero DB',
         logoBase64: '',
@@ -36,11 +37,12 @@ export class AppService {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_KEY;
 
-    if (supabaseUrl && supabaseKey) {
-      this.supabase = createClient(supabaseUrl, supabaseKey);
+    // Temporalmente desactivado para pruebas locales
+    if (false && supabaseUrl && supabaseKey) {
+      this.supabase = createClient(supabaseUrl!, supabaseKey!);
       console.log("Conectado a Supabase exitosamente.");
     } else {
-      console.log("⚠️ No se encontraron variables SUPABASE_URL ni SUPABASE_KEY. Usando base de datos en memoria.");
+      console.log("Modo memoria activado para pruebas locales.");
     }
   }
 
@@ -188,18 +190,22 @@ export class AppService {
 
   async createOrganization(data: any) {
     if (this.supabase) {
+      const identifier = this.generateIdentifier(data.institutionName);
       const { data: insertedOrg } = await this.supabase.from('organizations').insert({
         admin_user: data.adminUser,
         admin_pass: data.adminPass,
-        institution_name: data.institutionName
+        institution_name: data.institutionName,
+        identifier: identifier
       }).select().single();
       
       return insertedOrg;
     } else {
+      const identifier = this.generateIdentifier(data.institutionName);
       const newOrg = {
         id: `11111111-1111-1111-1111-${Math.floor(Math.random() * 1000000000000)}`,
         adminUser: data.adminUser,
         adminPass: data.adminPass,
+        identifier: identifier,
         config: {
           institutionName: data.institutionName,
           logoBase64: '',
@@ -211,6 +217,67 @@ export class AppService {
       };
       this.memoryOrgs.push(newOrg);
       return newOrg;
+    }
+  }
+
+  // Generar identificador URL-friendly a partir del nombre
+  private generateIdentifier(name: string): string {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .substring(0, 50);
+  }
+
+  // Buscar organización por identificador URL-friendly
+  async getOrgByIdentifier(identifier: string) {
+    if (this.supabase) {
+      const { data } = await this.supabase
+        .from('organizations')
+        .select('id')
+        .eq('identifier', identifier)
+        .maybeSingle();
+      
+      if (data) {
+        return { orgId: data.id };
+      }
+      return null;
+    } else {
+      const org = this.memoryOrgs.find(o => o.identifier === identifier);
+      if (org) {
+        return { orgId: org.id };
+      }
+      return null;
+    }
+  }
+
+  // Eliminar organización (solo SuperAdmin)
+  async deleteOrganization(orgId: string) {
+    if (this.supabase) {
+      // Eliminar créditos e inversiones asociados (CASCADE debería manejarlo)
+      const { error: deleteError } = await this.supabase
+        .from('organizations')
+        .delete()
+        .eq('id', orgId);
+      
+      if (deleteError) {
+        throw new Error('Error al eliminar organización: ' + deleteError.message);
+      }
+      
+      return { success: true, message: 'Organización eliminada exitosamente' };
+    } else {
+      const orgIndex = this.memoryOrgs.findIndex(o => o.id === orgId);
+      if (orgIndex === -1) {
+        throw new NotFoundException('Organización no encontrada');
+      }
+      
+      // No permitir eliminar la organización por defecto
+      if (this.memoryOrgs[orgIndex].id === '11111111-1111-1111-1111-111111111111') {
+        throw new Error('No se puede eliminar la organización por defecto');
+      }
+      
+      this.memoryOrgs.splice(orgIndex, 1);
+      return { success: true, message: 'Organización eliminada exitosamente' };
     }
   }
 }

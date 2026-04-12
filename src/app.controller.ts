@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, HttpCode, HttpStatus, Param } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, HttpCode, HttpStatus, Param } from '@nestjs/common';
 import { AppService } from './app.service';
 
 @Controller()
@@ -32,5 +32,16 @@ export class AppController {
   @Post('orgs')
   async createOrg(@Body() body: any) {
     return await this.appService.createOrganization(body);
+  }
+
+  @Delete('orgs/:orgId')
+  async deleteOrg(@Param('orgId') orgId: string) {
+    return await this.appService.deleteOrganization(orgId);
+  }
+
+  // Ruta para buscar organización por identificador (URL-friendly)
+  @Get('org/by-name/:identifier')
+  async getOrgByIdentifier(@Param('identifier') identifier: string) {
+    return await this.appService.getOrgByIdentifier(identifier);
   }
 }
