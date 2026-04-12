@@ -254,17 +254,29 @@ export class AppService {
   // Eliminar organización (solo SuperAdmin)
   async deleteOrganization(orgId: string) {
     if (this.supabase) {
-      // Eliminar créditos e inversiones asociados (CASCADE debería manejarlo)
-      const { error: deleteError } = await this.supabase
-        .from('organizations')
-        .delete()
-        .eq('id', orgId);
-      
-      if (deleteError) {
-        throw new Error('Error al eliminar organización: ' + deleteError.message);
+      // Eliminar en orden para evitar problemas de foreign keys
+      try {
+        // 1. Eliminar créditos asociados
+        await this.supabase.from('credits').delete().eq('org_id', orgId);
+        
+        // 2. Eliminar inversiones asociadas
+        await this.supabase.from('investments').delete().eq('org_id', orgId);
+        
+        // 3. Eliminar la organización
+        const { error: deleteError } = await this.supabase
+          .from('organizations')
+          .delete()
+          .eq('id', orgId);
+        
+        if (deleteError) {
+          throw new Error('Error al eliminar organización: ' + deleteError.message);
+        }
+        
+        return { success: true, message: 'Organización eliminada exitosamente' };
+      } catch (error) {
+        console.error('Error detallado al eliminar organización:', error);
+        throw new Error('Error al eliminar organización y sus datos asociados');
       }
-      
-      return { success: true, message: 'Organización eliminada exitosamente' };
     } else {
       const orgIndex = this.memoryOrgs.findIndex(o => o.id === orgId);
       if (orgIndex === -1) {
