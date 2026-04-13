@@ -45,6 +45,17 @@ export class AppController {
     return await this.appService.getOrgByIdentifier(identifier);
   }
 
+  // Rutas para SuperAdmins (ven todas las inversiones de todas las instituciones)
+  @Get('investment/all/history')
+  async getAllInvestmentHistory() {
+    return await this.appService.getAllInvestmentHistory();
+  }
+
+  @Get('investment/all/stats')
+  async getAllInvestmentStats() {
+    return await this.appService.getAllInvestmentStats();
+  }
+
   // Rutas para historial de inversiones
   @Post('investment/:orgId')
   @HttpCode(HttpStatus.OK)

@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS investment_history (
   org_id UUID NOT NULL REFERENCES organizations(id),
   client_name VARCHAR(255) NOT NULL,
   client_identification VARCHAR(50) NOT NULL,
+  client_phone VARCHAR(20),
   investment_type VARCHAR(100) NOT NULL,
   amount DECIMAL(12,2) NOT NULL,
   period_months INTEGER NOT NULL,
