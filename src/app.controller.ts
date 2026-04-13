@@ -44,4 +44,21 @@ export class AppController {
   async getOrgByIdentifier(@Param('identifier') identifier: string) {
     return await this.appService.getOrgByIdentifier(identifier);
   }
+
+  // Rutas para historial de inversiones
+  @Post('investment/:orgId')
+  @HttpCode(HttpStatus.OK)
+  async saveInvestment(@Param('orgId') orgId: string, @Body() body: any) {
+    return await this.appService.saveInvestmentRecord(orgId, body);
+  }
+
+  @Get('investment/:orgId/history')
+  async getInvestmentHistory(@Param('orgId') orgId: string, @Body() body: { filters?: any }) {
+    return await this.appService.getInvestmentHistory(orgId, body?.filters);
+  }
+
+  @Get('investment/:orgId/stats')
+  async getInvestmentStats(@Param('orgId') orgId: string) {
+    return await this.appService.getInvestmentHistoryStats(orgId);
+  }
 }

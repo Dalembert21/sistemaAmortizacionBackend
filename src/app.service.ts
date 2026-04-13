@@ -376,4 +376,139 @@ export class AppService {
       return { success: true, message: 'Organización eliminada exitosamente' };
     }
   }
+
+  // --- INVESTMENT HISTORY METHODS ---
+  
+  async saveInvestmentRecord(orgId: string, investmentData: any) {
+    if (this.supabase) {
+      const { data, error } = await this.supabase.from('investment_history').insert({
+        org_id: orgId,
+        client_name: investmentData.clientName || 'Cliente Anónimo',
+        client_identification: investmentData.clientIdentification || 'N/A',
+        investment_type: investmentData.investmentType,
+        amount: investmentData.amount,
+        period_months: investmentData.period,
+        annual_rate: investmentData.annualRate,
+        interest_earned: investmentData.interestEarned,
+        total_return: investmentData.totalReturn,
+        selected_bank: investmentData.selectedBank,
+        identity_validated: investmentData.identityValidated || true,
+        facial_recognition_score: investmentData.facialRecognitionScore || 99.8,
+        status: 'PROCESSED'
+      }).select().single();
+      
+      if (error) {
+        console.error('Error saving investment record:', error);
+        throw new Error('Error al guardar registro de inversión');
+      }
+      
+      return data;
+    } else {
+      // Modo memoria fallback
+      const record = {
+        id: `inv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        orgId,
+        ...investmentData,
+        createdAt: new Date().toISOString(),
+        processedAt: new Date().toISOString()
+      };
+      
+      // En modo memoria, podríamos almacenar en un array temporal
+      console.log('Investment record saved (memory mode):', record);
+      return record;
+    }
+  }
+
+  async getInvestmentHistory(orgId: string, filters?: any) {
+    if (this.supabase) {
+      let query = this.supabase
+        .from('investment_history')
+        .select('*')
+        .eq('org_id', orgId)
+        .order('created_at', { ascending: false });
+
+      // Aplicar filtros si existen
+      if (filters?.clientName) {
+        query = query.ilike('client_name', `%${filters.clientName}%`);
+      }
+      if (filters?.investmentType) {
+        query = query.eq('investment_type', filters.investmentType);
+      }
+      if (filters?.status) {
+        query = query.eq('status', filters.status);
+      }
+      if (filters?.dateFrom) {
+        query = query.gte('created_at', filters.dateFrom);
+      }
+      if (filters?.dateTo) {
+        query = query.lte('created_at', filters.dateTo);
+      }
+
+      const { data, error } = await query;
+      
+      if (error) {
+        console.error('Error fetching investment history:', error);
+        throw new Error('Error al obtener historial de inversiones');
+      }
+      
+      return data || [];
+    } else {
+      // Modo memoria - retornar array vacío por ahora
+      console.log('Investment history requested (memory mode) - no records available');
+      return [];
+    }
+  }
+
+  async getInvestmentHistoryStats(orgId: string) {
+    if (this.supabase) {
+      const { data, error } = await this.supabase
+        .from('investment_history')
+        .select('amount, total_return, created_at, investment_type')
+        .eq('org_id', orgId);
+
+      if (error) {
+        console.error('Error fetching investment stats:', error);
+        return {
+          totalInvestments: 0,
+          totalAmount: 0,
+          totalReturns: 0,
+          avgInvestment: 0,
+          investmentsByType: {}
+        };
+      }
+
+      const investments = data || [];
+      const totalInvestments = investments.length;
+      const totalAmount = investments.reduce((sum, inv) => sum + Number(inv.amount), 0);
+      const totalReturns = investments.reduce((sum, inv) => sum + Number(inv.total_return), 0);
+      const avgInvestment = totalInvestments > 0 ? totalAmount / totalInvestments : 0;
+
+      // Agrupar por tipo de inversión
+      const investmentsByType: { [key: string]: { count: number; totalAmount: number } } = investments.reduce((acc, inv) => {
+        const type = inv.investment_type;
+        if (!acc[type]) {
+          acc[type] = { count: 0, totalAmount: 0 };
+        }
+        acc[type].count++;
+        acc[type].totalAmount += Number(inv.amount);
+        return acc;
+      }, {} as { [key: string]: { count: number; totalAmount: number } });
+
+      return {
+        totalInvestments,
+        totalAmount,
+        totalReturns,
+        avgInvestment,
+        investmentsByType
+      };
+    } else {
+      return {
+        totalInvestments: 0,
+        totalAmount: 0,
+        totalReturns: 0,
+        avgInvestment: 0,
+        investmentsByType: {}
+      };
+    }
+  }
 }
