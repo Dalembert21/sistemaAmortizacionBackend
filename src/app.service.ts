@@ -28,7 +28,25 @@ export class AppService {
           { id: 3, name: 'Ahora Flex', minAmount: 50, maxAmount: 50000, minTerm: 1, maxTerm: 60 }
         ],
         insuranceRate: 0.1,
-        donationSolca: 2.0
+        donationSolca: 2.0,
+        indirectCharges: [
+          {
+            id: 1,
+            name: 'Seguro de Desgravamen',
+            chargeType: 'PERCENTAGE',
+            value: 0.1,
+            calculationBase: 'CURRENT_BALANCE',
+            isActive: true
+          },
+          {
+            id: 2,
+            name: 'Donación SOLCA',
+            chargeType: 'PERCENTAGE',
+            value: 2.0,
+            calculationBase: 'INITIAL_BALANCE',
+            isActive: true
+          }
+        ]
       }
     }
   ];
@@ -90,6 +108,41 @@ export class AppService {
       
       if (!orgData) throw new NotFoundException('Organización no encontrada');
       
+      // Try to get indirect charges from a separate table, fallback to JSON field
+      let indirectCharges = [];
+      try {
+        console.log(`Backend - Querying indirect_charges for org: ${orgId}`);
+        const { data: chargesData, error } = await this.supabase.from('indirect_charges').select('*').eq('org_id', orgId);
+        console.log(`Backend - chargesData:`, chargesData);
+        console.log(`Backend - error:`, error);
+        
+        if (chargesData && chargesData.length > 0) {
+          console.log(`Backend - Found ${chargesData.length} indirect charges`);
+          indirectCharges = chargesData.map(c => ({
+            id: c.id,
+            name: c.name,
+            chargeType: c.charge_type,
+            value: Number(c.value),
+            calculationBase: c.calculation_base,
+            isActive: c.is_active
+          }));
+          console.log(`Backend - Mapped charges:`, indirectCharges);
+        } else {
+          console.log(`Backend - No charges found, checking JSON field`);
+          if (orgData.indirect_charges) {
+            indirectCharges = orgData.indirect_charges;
+            console.log(`Backend - Using JSON field:`, indirectCharges);
+          }
+        }
+      } catch (error) {
+        console.log(`Backend - Error querying indirect_charges table:`, error);
+        // If indirect_charges table doesn't exist, try JSON field
+        if (orgData.indirect_charges) {
+          indirectCharges = orgData.indirect_charges;
+          console.log(`Backend - Using JSON field fallback:`, indirectCharges);
+        }
+      }
+      
       return {
         institutionName: orgData.institution_name || 'Sistema Financiero DB',
         logoBase64: orgData.logo_base_64,
@@ -110,7 +163,8 @@ export class AppService {
           maxAmount: Number(i.max_amount),
           minTerm: Number(i.min_term),
           maxTerm: Number(i.max_term)
-        }))
+        })),
+        indirectCharges
       };
     } else {
       const org = this.memoryOrgs.find(o => o.id === orgId);
@@ -125,7 +179,8 @@ export class AppService {
         institution_name: newConfig.institutionName,
         logo_base_64: newConfig.logoBase64 || '',
         insurance_rate: newConfig.insuranceRate,
-        donation_solca: newConfig.donationSolca
+        donation_solca: newConfig.donationSolca,
+        indirect_charges: newConfig.indirectCharges || []
       }).eq('id', orgId);
       
       if (updateError) {
@@ -160,6 +215,26 @@ export class AppService {
         }));
         await this.supabase.from('investments').insert(investmentsToInsert);
       }
+
+      // Handle indirect charges - try to use separate table first, fallback to JSON
+      try {
+        await this.supabase.from('indirect_charges').delete().eq('org_id', orgId);
+        if (newConfig.indirectCharges && newConfig.indirectCharges.length > 0) {
+          const chargesToInsert = newConfig.indirectCharges.map((c: any) => ({
+            org_id: orgId,
+            name: c.name,
+            charge_type: c.chargeType,
+            value: c.value,
+            calculation_base: c.calculationBase,
+            is_active: c.isActive
+          }));
+          await this.supabase.from('indirect_charges').insert(chargesToInsert);
+        }
+      } catch (error) {
+        // If indirect_charges table doesn't exist, the JSON field in organizations table will be used
+        console.log('indirect_charges table not found, using JSON field');
+      }
+
       return newConfig;
     } else {
       const orgIndex = this.memoryOrgs.findIndex(o => o.id === orgId);
@@ -212,7 +287,8 @@ export class AppService {
           credits: [],
           investments: [],
           insuranceRate: 0,
-          donationSolca: 0
+          donationSolca: 0,
+          indirectCharges: []
         }
       };
       this.memoryOrgs.push(newOrg);
@@ -262,7 +338,15 @@ export class AppService {
         // 2. Eliminar inversiones asociadas
         await this.supabase.from('investments').delete().eq('org_id', orgId);
         
-        // 3. Eliminar la organización
+        // 3. Eliminar cobros indirectos asociados
+        try {
+          await this.supabase.from('indirect_charges').delete().eq('org_id', orgId);
+        } catch (error) {
+          // Table might not exist, continue
+          console.log('indirect_charges table not found, continuing');
+        }
+        
+        // 4. Eliminar la organización
         const { error: deleteError } = await this.supabase
           .from('organizations')
           .delete()
