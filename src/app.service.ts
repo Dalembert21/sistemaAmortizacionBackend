@@ -32,7 +32,7 @@ export class AppService {
 
       config: {
 
-        institutionName: 'Sistema Financiero DB',
+        institutionName: 'DalpaSoft',
 
         logoBase64: '',
 
@@ -184,7 +184,7 @@ export class AppService {
 
       return {
 
-        institutionName: orgData.institution_name || 'Sistema Financiero DB',
+        institutionName: orgData.institution_name || 'DalpaSoft',
 
         logoBase64: orgData.logo_base_64,
 

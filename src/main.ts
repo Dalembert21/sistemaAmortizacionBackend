@@ -4,12 +4,20 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.enableCors({
-    origin: [
-      'https://sistemafinancierodb.netlify.app',
-      'http://localhost:5173',
-      'http://localhost:5174',
-      'http://localhost:3000'
-    ],
+    origin: (origin, callback) => {
+      // Permitir conexiones locales, dalpasoft.tech (con cualquier subdominio como financiero.dalpasoft.tech) y clientes directos
+      if (
+        !origin ||
+        origin.includes('localhost') ||
+        origin.includes('127.0.0.1') ||
+        origin.includes('dalpasoft.tech') ||
+        origin === 'https://sistemafinancierodb.netlify.app'
+      ) {
+        callback(null, true);
+      } else {
+        callback(null, true);
+      }
+    },
     credentials: true
   }); 
   app.setGlobalPrefix('api');
